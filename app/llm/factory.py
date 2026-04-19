@@ -1,10 +1,11 @@
 from app.llm.providers.openrouter import OpenRouterProvider
-
+from app.llm.providers.groq import GroqProvider
 
 class LLMFactory:
 
     PROVIDERS = {
         "openrouter": OpenRouterProvider,
+        "groq": GroqProvider,
     }
 
     @staticmethod
