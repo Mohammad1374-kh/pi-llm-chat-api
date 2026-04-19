@@ -10,5 +10,6 @@ class Settings:
     DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./app.db")
     GROQ_MODEL = os.getenv("GROQ_MODEL")
     OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL")
+    SECRET_KEY = os.getenv("SECRET_KEY")
 
 settings = Settings()
