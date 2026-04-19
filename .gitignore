@@ -19,4 +19,8 @@ __pycache__/
 
 .vscode/
 
+# developers test
 scratch/
+
+# local db
+data/
