@@ -3,7 +3,7 @@ import requests
 
 from app.core.config import settings
 from app.llm.base import LLMProvider
-
+from app.core.logger import logger
 
 class GroqProvider(LLMProvider):
 
@@ -53,6 +53,10 @@ class GroqProvider(LLMProvider):
                 break
 
             chunk = json.loads(data)
+
+            if "error" in chunk:
+                logger.error(f"[LLM_ERROR] provider response error: {chunk}")
+                raise ValueError(chunk["error"]["message"])
 
             token = (
                 chunk.get("choices", [{}])[0]

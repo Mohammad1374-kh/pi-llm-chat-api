@@ -1,6 +1,8 @@
 from app.repositories.chat_repository import ChatRepository
 from app.llm.factory import LLMFactory
 from app.core.config import settings
+from app.core.logger import logger
+from app.core.timing import StreamingTimer
 
 
 class ChatService:
@@ -59,6 +61,10 @@ class ChatService:
     @staticmethod
     def stream_chat(db, user, message: str, conversation_id=None):
 
+        logger.info("[LLM_STREAM] token streaming started")
+        timer = StreamingTimer()
+        timer.start()
+
         # create or load conversation
         if conversation_id:
             conversation = ChatRepository.get_conversation(
@@ -85,15 +91,19 @@ class ChatService:
             message
         )
 
+        logger.info(f"[LLM_START] provider={settings.LLM_PROVIDER}")
+        logger.info("[LLM_START] streaming initiated")
         provider = LLMFactory.create(settings.LLM_PROVIDER)
 
         def event_stream():
             full_response = ""
 
             for token in provider.stream(message):
+                timer.on_token(token)
                 full_response += token
                 #sends the token first to api layer then saves in db
                 yield f"data: {token}\n\n"
+
 
             ChatRepository.create_message(
                 db,
@@ -101,5 +111,19 @@ class ChatService:
                 "assistant",
                 full_response
             )
+
+            logger.info(f"[CHAT_DONE] conversation_id={conversation.id}")
+            logger.info("[CHAT_DONE] message persisted successfully")
+
+            timer.stop()
+
+            result = {
+                "ttft_ms": timer.ttft_ms,
+                "ttlt_ms": timer.ttlt_ms,
+                "chars_per_sec": timer.chars_per_sec,
+                "chars": len(full_response),
+            }
+
+            logger.info(result)
 
         return event_stream()

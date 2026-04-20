@@ -8,6 +8,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from app.api.deps import get_db
 from app.models.user import User
+from app.core.logger import logger
 
 
 ALGORITHM = "HS256"
@@ -28,6 +29,7 @@ def decode_access_token(token: str):
         )
         return payload
     except JWTError:
+        logger.warning("Invalid or expired JWT token received")
         return None
 
 
@@ -40,15 +42,22 @@ def get_current_user(
     payload = decode_access_token(token)
 
     if not payload:
+        logger.warning("Authentication failed: invalid token")
         raise HTTPException(status_code=401, detail="Invalid token")
 
     email = payload.get("sub")
 
+    if not email:
+        logger.warning("Token missing 'sub' claim")
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+
     user = db.query(User).filter(User.email == email).first()
 
     if not user:
+        logger.warning(f"Authentication failed: user not found ({email})")
         raise HTTPException(status_code=401, detail="User not found")
 
+    logger.info(f"User authenticated successfully: {email}")
     return user
 
 def hash_password(password: str):

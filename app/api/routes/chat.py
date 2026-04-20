@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse
 from app.schemas.chat_requests import ChatRequest
 from fastapi.responses import StreamingResponse
 from fastapi import HTTPException
-
+from app.core.logger import logger
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -29,12 +29,22 @@ def chat(
         db: Session = Depends(get_db),
         user=Depends(get_current_user)
 ):
-    stream = ChatService.stream_chat(
+
+    logger.info(f"[CHAT_REQUEST] user_id={user.id}")
+    logger.info(f"[CHAT_REQUEST] conversation_id={data.conversation_id}")
+    logger.info(f"[CHAT_REQUEST] message_length={len(data.message)}")
+
+
+    try:
+        stream = ChatService.stream_chat(
         db,
         user,
         data.message,
         data.conversation_id
-    )
+        )
+    except Exception as e:
+        logger.error(f"[CHAT_ERROR] user_id={user.id} error={str(e)}")
+        raise
 
     return StreamingResponse(
         stream,

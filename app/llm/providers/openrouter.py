@@ -1,6 +1,6 @@
 import json
 import requests
-
+from app.core.logger import logger
 from app.core.config import settings
 from app.llm.base import LLMProvider
 
@@ -57,8 +57,10 @@ class OpenRouterProvider(LLMProvider):
 
             chunk = json.loads(data)
 
+            # provider-side streamed error payload
             if "error" in chunk:
-                raise Exception(chunk["error"]["message"])
+                logger.error(f"[LLM_ERROR] provider response error: {chunk}")
+                raise ValueError(chunk["error"]["message"])
 
             token = (
                 chunk.get("choices", [{}])[0]
