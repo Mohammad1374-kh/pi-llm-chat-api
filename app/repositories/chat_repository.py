@@ -7,6 +7,29 @@ from app.models.message import Message
 class ChatRepository:
 
     @staticmethod
+    def get_conversation_with_messages(db, conversation_id: int, user_id: int):
+        conversation = (
+            db.query(Conversation)
+            .filter(
+                Conversation.id == conversation_id,
+                Conversation.user_id == user_id
+            )
+            .first()
+        )
+
+        if not conversation:
+            return None
+
+        messages = (
+            db.query(Message)
+            .filter(Message.conversation_id == conversation_id)
+            .order_by(Message.created_at.asc())
+            .all()
+        )
+
+        return conversation, messages
+
+    @staticmethod
     def create_conversation(db, user_id: int, title: str):
         conv = Conversation(
             user_id=user_id,

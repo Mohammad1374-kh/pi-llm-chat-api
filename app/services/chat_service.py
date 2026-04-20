@@ -6,6 +6,31 @@ from app.core.config import settings
 class ChatService:
 
     @staticmethod
+    def get_thread(db, user, conversation_id: int):
+        result = ChatRepository.get_conversation_with_messages(
+            db,
+            conversation_id,
+            user.id
+        )
+
+        if not result:
+            return None
+
+        conversation, messages = result
+
+        return {
+            "conversation_id": conversation.id,
+            "title": conversation.title,
+            "messages": [
+                {
+                    "role": msg.role,
+                    "content": msg.content
+                }
+                for msg in messages
+            ]
+        }
+
+    @staticmethod
     def get_history(db, user):
         conversations = ChatRepository.get_user_conversations(
             db,

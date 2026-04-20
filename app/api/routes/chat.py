@@ -8,6 +8,7 @@ from app.schemas.chat_responses import ConversationResponse
 from fastapi.responses import StreamingResponse
 from app.schemas.chat_requests import ChatRequest
 from fastapi.responses import StreamingResponse
+from fastapi import HTTPException
 
 
 router = APIRouter(prefix="/chat", tags=["chat"])
@@ -39,3 +40,23 @@ def chat(
         stream,
         media_type="text/event-stream"
     )
+
+@router.get("/{conversation_id}", response_model=ConversationResponse)
+def get_chat_thread(
+        conversation_id: int,
+        db: Session = Depends(get_db),
+        user=Depends(get_current_user)
+):
+    result = ChatService.get_thread(
+        db,
+        user,
+        conversation_id
+    )
+
+    if not result:
+        raise HTTPException(
+            status_code=404,
+            detail="Conversation not found"
+        )
+
+    return result
