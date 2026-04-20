@@ -11,5 +11,6 @@ class Settings:
     GROQ_MODEL = os.getenv("GROQ_MODEL")
     OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL")
     SECRET_KEY = os.getenv("SECRET_KEY")
+    LLM_PROVIDER = os.getenv("LLM_PROVIDER", "groq")
 
 settings = Settings()
