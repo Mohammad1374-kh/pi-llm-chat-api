@@ -11,11 +11,16 @@ from fastapi.responses import StreamingResponse
 from fastapi import HTTPException
 from app.core.logger import logger
 
-router = APIRouter(prefix="/chat", tags=["chat"])
+router = APIRouter(prefix="/chat", tags=["Chat"])
 
 
 
-@router.get("/history", response_model=list[ConversationResponse])
+@router.get(
+    "/history",
+    response_model=list[ConversationResponse],
+    summary="Get all user conversations",
+    description="Returns all conversations and related messages for the authenticated user."
+)
 def get_chat_history(
         db: Session = Depends(get_db),
         user=Depends(get_current_user)
@@ -23,7 +28,11 @@ def get_chat_history(
     return ChatService.get_history(db, user)
 
 
-@router.post("")
+@router.post(
+    "",
+    summary="Send message to LLM",
+    description="Streams assistant response token-by-token using Server-Sent Events (SSE)."
+)
 def chat(
         data: ChatRequest,
         db: Session = Depends(get_db),
@@ -51,7 +60,12 @@ def chat(
         media_type="text/event-stream"
     )
 
-@router.get("/{conversation_id}", response_model=ConversationResponse)
+@router.get(
+    "/{conversation_id}",
+    response_model=ConversationResponse,
+    summary="Get single conversation thread",
+    description="Returns all messages for one conversation owned by authenticated user."
+)
 def get_chat_thread(
         conversation_id: int,
         db: Session = Depends(get_db),
