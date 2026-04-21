@@ -1,35 +1,33 @@
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
+
 from app.core.logger import logger
-from app.repositories.user_repository import UserRepository
 from app.core.security import (
     hash_password,
     verify_password,
     create_access_token
 )
+from app.repositories.user_repository import UserRepository
 
 
 class AuthService:
 
     @staticmethod
     def register(db: Session, email: str, password: str):
-
         logger.info(f"[AUTH] Register attempt: {email}")
 
-        existing = UserRepository.get_by_email(db, email)
-
-        if existing:
-            logger.warning(f"[AUTH] Register failed (exists): {email}")
+        if UserRepository.get_by_email(db, email):
+            logger.warning(f"[AUTH] Register failed - email exists: {email}")
             raise HTTPException(
                 status_code=400,
                 detail="Email already exists"
             )
 
-        hashed = hash_password(password)
+        hashed_password = hash_password(password)
 
-        UserRepository.create(db, email, hashed)
+        UserRepository.create(db, email, hashed_password)
 
-        logger.info(f"[AUTH] User created: {email}")
+        logger.info(f"[AUTH] User registered: {email}")
 
         return {"message": "User registered successfully"}
 
@@ -39,15 +37,8 @@ class AuthService:
 
         user = UserRepository.get_by_email(db, email)
 
-        if not user:
-            logger.warning(f"[AUTH] Login failed - user not found: {email}")
-            raise HTTPException(
-                status_code=401,
-                detail="Invalid credentials"
-            )
-
-        if not verify_password(password, user.hashed_password):
-            logger.warning(f"[AUTH] Login failed - invalid password: {email}")
+        if not user or not verify_password(password, user.hashed_password):
+            logger.warning(f"[AUTH] Login failed: {email}")
             raise HTTPException(
                 status_code=401,
                 detail="Invalid credentials"

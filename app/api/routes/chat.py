@@ -1,18 +1,15 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db
-from app.core.security import get_current_user
-from app.services.chat_service import ChatService
-from app.schemas.chat_responses import ConversationResponse
-from fastapi.responses import StreamingResponse
-from app.schemas.chat_requests import ChatRequest
-from fastapi.responses import StreamingResponse
-from fastapi import HTTPException
 from app.core.logger import logger
+from app.core.security import get_current_user
+from app.schemas.chat_requests import ChatRequest
+from app.schemas.chat_responses import ConversationResponse
+from app.services.chat_service import ChatService
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
-
 
 
 @router.get(
@@ -22,8 +19,8 @@ router = APIRouter(prefix="/chat", tags=["Chat"])
     description="Returns all conversations and related messages for the authenticated user."
 )
 def get_chat_history(
-        db: Session = Depends(get_db),
-        user=Depends(get_current_user)
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
 ):
     return ChatService.get_history(db, user)
 
@@ -34,31 +31,32 @@ def get_chat_history(
     description="Streams assistant response token-by-token using Server-Sent Events (SSE)."
 )
 def chat(
-        data: ChatRequest,
-        db: Session = Depends(get_db),
-        user=Depends(get_current_user)
+    data: ChatRequest,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
 ):
-
-    logger.info(f"[CHAT_REQUEST] user_id={user.id}")
-    logger.info(f"[CHAT_REQUEST] conversation_id={data.conversation_id}")
-    logger.info(f"[CHAT_REQUEST] message_length={len(data.message)}")
-
+    logger.info(
+        f"[CHAT_REQUEST] user_id={user.id} "
+        f"conversation_id={data.conversation_id} "
+        f"message_length={len(data.message)}"
+    )
 
     try:
         stream = ChatService.stream_chat(
-        db,
-        user,
-        data.message,
-        data.conversation_id
+            db,
+            user,
+            data.message,
+            data.conversation_id
         )
-    except Exception as e:
-        logger.error(f"[CHAT_ERROR] user_id={user.id} error={str(e)}")
+    except Exception:
+        logger.exception(f"[CHAT_ERROR] user_id={user.id}")
         raise
 
     return StreamingResponse(
         stream,
         media_type="text/event-stream"
     )
+
 
 @router.get(
     "/{conversation_id}",
@@ -67,9 +65,9 @@ def chat(
     description="Returns all messages for one conversation owned by authenticated user."
 )
 def get_chat_thread(
-        conversation_id: int,
-        db: Session = Depends(get_db),
-        user=Depends(get_current_user)
+    conversation_id: int,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
 ):
     result = ChatService.get_thread(
         db,

@@ -1,13 +1,18 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
-from app.core.config import settings
 from app.core.database import Base, engine
-from app.models import user, conversation, message
 from app.api.routes.auth import router as auth_router
 from app.api.routes.chat import router as chat_router
 
 
-Base.metadata.create_all(bind=engine)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup logic
+    Base.metadata.create_all(bind=engine)
+    yield
+    # Shutdown logic (none needed now)
+
 
 app = FastAPI(
     title="Pi LLM Chat API",
@@ -19,9 +24,10 @@ Features:
 - Streaming chat responses (SSE)
 - Conversation history persistence
 - Dockerized deployment
-- Pluggable LLM providers (Groq / OpenRouter)
+- Pluggable LLM providers
 """,
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 app.include_router(auth_router)

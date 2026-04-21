@@ -9,7 +9,11 @@ class UserRepository:
         return db.query(User).filter(User.email == email).first()
 
     @staticmethod
-    def create(db: Session, email: str, hashed_password: str):
+    def create(
+        db: Session,
+        email: str,
+        hashed_password: str
+    ) -> User:
         user = User(
             email=email,
             hashed_password=hashed_password

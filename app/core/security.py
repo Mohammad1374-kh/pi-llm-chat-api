@@ -1,14 +1,15 @@
 from datetime import datetime, timedelta
-from jose import jwt
-from passlib.context import CryptContext
-from app.core.config import settings
-from jose import JWTError
+
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from jose import jwt, JWTError
+from passlib.context import CryptContext
 from sqlalchemy.orm import Session
+
 from app.api.deps import get_db
-from app.models.user import User
+from app.core.config import settings
 from app.core.logger import logger
+from app.models.user import User
 
 
 ALGORITHM = "HS256"
@@ -20,64 +21,58 @@ pwd_context = CryptContext(
 
 security = HTTPBearer()
 
+
 def decode_access_token(token: str):
     try:
-        payload = jwt.decode(
+        return jwt.decode(
             token,
             settings.SECRET_KEY,
             algorithms=[ALGORITHM]
         )
-        return payload
     except JWTError:
-        logger.warning("Invalid or expired JWT token received")
+        logger.warning("[SECURITY] Invalid JWT token")
         return None
 
 
 def get_current_user(
-        credentials: HTTPAuthorizationCredentials = Depends(security),
-        db: Session = Depends(get_db)
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
 ):
-    token = credentials.credentials
-
-    payload = decode_access_token(token)
+    payload = decode_access_token(credentials.credentials)
 
     if not payload:
-        logger.warning("Authentication failed: invalid token")
-        raise HTTPException(status_code=401, detail="Invalid token")
+        raise HTTPException(401, "Invalid token")
 
     email = payload.get("sub")
 
     if not email:
-        logger.warning("Token missing 'sub' claim")
-        raise HTTPException(status_code=401, detail="Invalid token payload")
+        raise HTTPException(401, "Invalid token payload")
 
     user = db.query(User).filter(User.email == email).first()
 
     if not user:
-        logger.warning(f"Authentication failed: user not found ({email})")
-        raise HTTPException(status_code=401, detail="User not found")
+        logger.warning(f"[SECURITY] User not found: {email}")
+        raise HTTPException(401, "User not found")
 
-    logger.info(f"User authenticated successfully: {email}")
+    logger.info(f"[SECURITY] Authenticated: {email}")
+
     return user
+
 
 def hash_password(password: str):
     return pwd_context.hash(password)
 
-#raw password from login form ,stored hash from DB  , returns true/false
+
 def verify_password(password: str, hashed_password: str):
     return pwd_context.verify(password, hashed_password)
 
 
 def create_access_token(data: dict):
-    #Avoid modifying original dict.
     payload = data.copy()
-
     payload["exp"] = datetime.utcnow() + timedelta(hours=12)
 
-    token = jwt.encode(
+    return jwt.encode(
         payload,
         settings.SECRET_KEY,
         algorithm=ALGORITHM
     )
-
-    return token

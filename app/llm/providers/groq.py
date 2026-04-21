@@ -2,8 +2,10 @@ import json
 import requests
 
 from app.core.config import settings
-from app.llm.base import LLMProvider
 from app.core.logger import logger
+from app.llm.base import LLMProvider
+from app.llm.exceptions import LLMProviderError
+
 
 class GroqProvider(LLMProvider):
 
@@ -14,29 +16,28 @@ class GroqProvider(LLMProvider):
     def _send_request(self, prompt: str):
         url = "https://api.groq.com/openai/v1/chat/completions"
 
-        headers = {
-            "Authorization": f"Bearer {settings.GROQ_API_KEY}",
-            "Content-Type": "application/json",
-        }
+        try:
+            response = requests.post(
+                url,
+                headers={
+                    "Authorization": f"Bearer {settings.GROQ_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": settings.GROQ_MODEL,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "stream": True
+                },
+                stream=True,
+                timeout=60
+            )
 
-        payload = {
-            "model": settings.GROQ_MODEL,
-            "messages": [
-                {"role": "user", "content": prompt}
-            ],
-            "stream": True
-        }
+            response.raise_for_status()
+            return response
 
-        response = requests.post(
-            url,
-            headers=headers,
-            json=payload,
-            stream=True,
-            timeout=60
-        )
-
-        response.raise_for_status()
-        return response
+        except requests.RequestException as e:
+            logger.error(f"[LLM_GROQ] request failed: {str(e)}")
+            raise LLMProviderError(str(e))
 
     def _parse_stream(self, response):
         for raw_line in response.iter_lines(decode_unicode=True):
@@ -55,8 +56,8 @@ class GroqProvider(LLMProvider):
             chunk = json.loads(data)
 
             if "error" in chunk:
-                logger.error(f"[LLM_ERROR] provider response error: {chunk}")
-                raise ValueError(chunk["error"]["message"])
+                logger.error(f"[LLM_GROQ] provider error: {chunk}")
+                raise LLMProviderError(chunk["error"]["message"])
 
             token = (
                 chunk.get("choices", [{}])[0]

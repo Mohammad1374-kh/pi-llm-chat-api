@@ -25,6 +25,6 @@ def run_benchmark(provider_name: str, prompt: str):
         "chars": len(full_response),
     }
 
-    logger.info(result)
+    logger.info(f"[BENCHMARK] {result}")
 
     return result

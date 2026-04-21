@@ -1,14 +1,26 @@
-from app.repositories.chat_repository import ChatRepository
-from app.llm.factory import LLMFactory
+from sqlalchemy.orm import Session
+
 from app.core.config import settings
 from app.core.logger import logger
 from app.core.timing import StreamingTimer
+from app.llm.factory import LLMFactory
+from app.repositories.chat_repository import ChatRepository
 
 
 class ChatService:
 
     @staticmethod
-    def get_thread(db, user, conversation_id: int):
+    def _serialize_messages(messages):
+        return [
+            {
+                "role": msg.role,
+                "content": msg.content
+            }
+            for msg in messages
+        ]
+
+    @staticmethod
+    def get_thread(db: Session, user, conversation_id: int):
         result = ChatRepository.get_conversation_with_messages(
             db,
             conversation_id,
@@ -23,67 +35,48 @@ class ChatService:
         return {
             "conversation_id": conversation.id,
             "title": conversation.title,
-            "messages": [
-                {
-                    "role": msg.role,
-                    "content": msg.content
-                }
-                for msg in messages
-            ]
+            "messages": ChatService._serialize_messages(messages)
         }
 
     @staticmethod
-    def get_history(db, user):
-        conversations = ChatRepository.get_user_conversations(
-            db,
-            user.id
-        )
+    def get_history(db: Session, user):
+        conversations = ChatRepository.get_user_conversations(db, user.id)
 
-        result = []
-
-        for conv in conversations:
-            messages = ChatRepository.get_messages(db, conv.id)
-
-            result.append({
+        return [
+            {
                 "conversation_id": conv.id,
                 "title": conv.title,
-                "messages": [
-                    {
-                        "role": msg.role,
-                        "content": msg.content
-                    }
-                    for msg in messages
-                ]
-            })
-
-        return result
+                "messages": ChatService._serialize_messages(
+                    ChatRepository.get_messages(db, conv.id)
+                )
+            }
+            for conv in conversations
+        ]
 
     @staticmethod
-    def stream_chat(db, user, message: str, conversation_id=None):
+    def stream_chat(db: Session, user, message: str, conversation_id=None):
 
-        logger.info("[LLM_STREAM] token streaming started")
+        logger.info(f"[CHAT] Request received user_id={user.id}")
+
         timer = StreamingTimer()
         timer.start()
 
-        # create or load conversation
+        conversation = None
+
         if conversation_id:
             conversation = ChatRepository.get_conversation(
                 db,
                 conversation_id,
                 user.id
             )
-        else:
-            conversation = None
 
         if not conversation:
-            title = message[:50]
             conversation = ChatRepository.create_conversation(
                 db,
                 user.id,
-                title
+                message[:50]
             )
 
-        # save user message
         ChatRepository.create_message(
             db,
             conversation.id,
@@ -91,9 +84,9 @@ class ChatService:
             message
         )
 
-        logger.info(f"[LLM_START] provider={settings.LLM_PROVIDER}")
-        logger.info("[LLM_START] streaming initiated")
         provider = LLMFactory.create(settings.LLM_PROVIDER)
+
+        logger.info(f"[LLM] Streaming started provider={settings.LLM_PROVIDER}")
 
         def event_stream():
             full_response = ""
@@ -101,9 +94,7 @@ class ChatService:
             for token in provider.stream(message):
                 timer.on_token(token)
                 full_response += token
-                #sends the token first to api layer then saves in db
                 yield f"data: {token}\n\n"
-
 
             ChatRepository.create_message(
                 db,
@@ -112,18 +103,17 @@ class ChatService:
                 full_response
             )
 
-            logger.info(f"[CHAT_DONE] conversation_id={conversation.id}")
-            logger.info("[CHAT_DONE] message persisted successfully")
-
             timer.stop()
 
-            result = {
+            logger.info(
+                f"[CHAT] Completed conversation_id={conversation.id}"
+            )
+
+            logger.info({
                 "ttft_ms": timer.ttft_ms,
                 "ttlt_ms": timer.ttlt_ms,
                 "chars_per_sec": timer.chars_per_sec,
                 "chars": len(full_response),
-            }
-
-            logger.info(result)
+            })
 
         return event_stream()

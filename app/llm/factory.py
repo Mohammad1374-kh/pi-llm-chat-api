@@ -1,5 +1,7 @@
 from app.llm.providers.openrouter import OpenRouterProvider
 from app.llm.providers.groq import GroqProvider
+from app.llm.exceptions import LLMProviderError
+
 
 class LLMFactory:
 
@@ -10,11 +12,9 @@ class LLMFactory:
 
     @staticmethod
     def create(provider_name: str):
-        provider_name = provider_name.lower()
-
-        provider_cls = LLMFactory.PROVIDERS.get(provider_name)
+        provider_cls = LLMFactory.PROVIDERS.get(provider_name.lower())
 
         if not provider_cls:
-            raise ValueError(f"Unsupported provider: {provider_name}")
+            raise LLMProviderError(f"Unsupported provider: {provider_name}")
 
         return provider_cls()
