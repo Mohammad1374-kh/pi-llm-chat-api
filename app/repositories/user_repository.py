@@ -21,6 +21,8 @@ class UserRepository:
 
         db.add(user)
         db.commit()
+
+        # loads generated fields (id, created_at) from DB
         db.refresh(user)
 
         return user

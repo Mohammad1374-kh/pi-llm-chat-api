@@ -19,6 +19,7 @@ def run_benchmark(provider_name: str, prompt: str):
 
     result = {
         "provider": provider_name,
+        "output": full_response,
         "ttft_ms": timer.ttft_ms,
         "ttlt_ms": timer.ttlt_ms,
         "chars_per_sec": timer.chars_per_sec,

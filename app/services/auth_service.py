@@ -16,6 +16,7 @@ class AuthService:
     def register(db: Session, email: str, password: str):
         logger.info(f"[AUTH] Register attempt: {email}")
 
+        # Prevent duplicate accounts using same email
         if UserRepository.get_by_email(db, email):
             logger.warning(f"[AUTH] Register failed - email exists: {email}")
             raise HTTPException(
@@ -23,6 +24,7 @@ class AuthService:
                 detail="Email already exists"
             )
 
+        # Hash password before storing for security (never store plain text passwords)
         hashed_password = hash_password(password)
 
         UserRepository.create(db, email, hashed_password)
@@ -37,6 +39,7 @@ class AuthService:
 
         user = UserRepository.get_by_email(db, email)
 
+        # Validate user existence and verify password hash
         if not user or not verify_password(password, user.hashed_password):
             logger.warning(f"[AUTH] Login failed: {email}")
             raise HTTPException(
@@ -44,6 +47,7 @@ class AuthService:
                 detail="Invalid credentials"
             )
 
+        # Create JWT access token with user identity (email stored in 'sub' claim)
         token = create_access_token({"sub": user.email})
 
         logger.info(f"[AUTH] Login success: {email}")
