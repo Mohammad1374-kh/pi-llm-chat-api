@@ -10,10 +10,12 @@ from app.llm.exceptions import LLMProviderError
 class OpenRouterProvider(LLMProvider):
 
     def stream(self, prompt: str):
+        # Entry point: send request and yield streamed tokens
         response = self._send_request(prompt)
         yield from self._parse_stream(response)
 
     def _send_request(self, prompt: str):
+        # Send HTTP request to OpenRouter with streaming enabled
         url = "https://openrouter.ai/api/v1/chat/completions"
 
         try:
@@ -28,6 +30,7 @@ class OpenRouterProvider(LLMProvider):
                     "messages": [{"role": "user", "content": prompt}],
                     "stream": True
                 },
+                # stream=True enables token-by-token response
                 stream=True,
                 timeout=60
             )
@@ -36,28 +39,34 @@ class OpenRouterProvider(LLMProvider):
             return response
 
         except requests.RequestException as e:
+            # Network / HTTP errors (timeout, connection, bad response)
             logger.error(f"[LLM_OPENROUTER] request failed: {str(e)}")
             raise LLMProviderError(str(e))
 
     def _parse_stream(self, response):
+        # Parse Server-Sent Events (SSE) stream and yield tokens incrementally
         for raw_line in response.iter_lines(decode_unicode=True):
 
             if not raw_line:
                 continue
 
             if raw_line.startswith(":"):
+                # Skip SSE comment/heartbeat lines (OpenRouter-specific behavior)
                 continue
 
+            # Process only data lines from SSE stream
             if not raw_line.startswith("data:"):
                 continue
 
             data = raw_line.removeprefix("data:").strip()
 
+            # End of stream signal
             if data == "[DONE]":
                 break
 
             chunk = json.loads(data)
 
+            # End of stream signal
             if "error" in chunk:
                 logger.error(f"[LLM_OPENROUTER] provider error: {chunk}")
                 raise LLMProviderError(chunk["error"]["message"])

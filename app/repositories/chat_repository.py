@@ -1,3 +1,5 @@
+from pyexpat.errors import messages
+
 from sqlalchemy.orm import Session
 from app.models.conversation import Conversation
 from app.models.message import Message
@@ -11,26 +13,23 @@ class ChatRepository:
         conversation_id: int,
         user_id: int
     ):
-        conversation = (
-            db.query(Conversation)
-            .filter(
-                Conversation.id == conversation_id,
-                Conversation.user_id == user_id
-            )
-            .first()
-        )
+        # Fetch conversation and its messages, ensuring it belongs to the user
 
+        conversation = ChatRepository.get_conversation(
+                db,
+                conversation_id,
+                user_id
+            )
+
+        # Conversation not found or does not belong to user
         if not conversation:
             return None
 
-        messages = (
-            db.query(Message)
-            .filter(Message.conversation_id == conversation_id)
-            .order_by(Message.created_at.asc())
-            .all()
-        )
+        messages = ChatRepository.get_messages(db, conversation_id)
 
         return conversation, messages
+
+
 
     @staticmethod
     def create_conversation(
@@ -43,6 +42,7 @@ class ChatRepository:
             title=title
         )
 
+        # Create and persist a new conversation
         db.add(conv)
         db.commit()
         db.refresh(conv)
@@ -76,6 +76,7 @@ class ChatRepository:
             content=content
         )
 
+        # Persist a single chat message (user or assistant)
         db.add(msg)
         db.commit()
         return msg
@@ -85,6 +86,7 @@ class ChatRepository:
         db: Session,
         user_id: int
     ):
+        # Retrieve all conversations for a user (most recent first)
         return (
             db.query(Conversation)
             .filter(Conversation.user_id == user_id)
@@ -97,6 +99,7 @@ class ChatRepository:
         db: Session,
         conversation_id: int
     ):
+        # Retrieve messages for a conversation in chronological order
         return (
             db.query(Message)
             .filter(Message.conversation_id == conversation_id)

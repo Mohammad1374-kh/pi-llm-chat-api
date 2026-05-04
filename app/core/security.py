@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_db
 from app.core.config import settings
 from app.core.logger import logger
-from app.models.user import User
+from app.repositories.user_repository import UserRepository
 
 
 ALGORITHM = "HS256"
@@ -48,7 +48,7 @@ def get_current_user(
     if not email:
         raise HTTPException(401, "Invalid token payload")
 
-    user = db.query(User).filter(User.email == email).first()
+    user = UserRepository.get_by_email(db, str(email))
 
     if not user:
         logger.warning(f"[SECURITY] User not found: {email}")
@@ -69,6 +69,8 @@ def verify_password(password: str, hashed_password: str):
 
 def create_access_token(data: dict):
     payload = data.copy()
+
+    # Token expires in 12 hours
     payload["exp"] = datetime.utcnow() + timedelta(hours=12)
 
     return jwt.encode(
