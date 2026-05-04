@@ -193,7 +193,6 @@ docker compose down
 - Add contextual memory (sliding window / summarization)
 - Add retry + circuit breaker for LLM API failures
 - Introduce async DB layer (SQLAlchemy async)
-- Add unit + integration test suite
 - Implement rate limiting and request throttling for authentication and chat endpoints to improve API resilience and cost control
 
 ## 📖 API Documentation
